@@ -87,16 +87,21 @@ fn main() {
         agent_config: AgentConfig::WINPTY_FLAG_COLOR_ESCAPES,
     };
 
+    #[cfg(feature = "winpty")]
+    let pty_backend = PTYBackend::WinPTY;
+
+    #[cfg(not(feature = "winpty"))]
+    let pty_backend = PTYBackend::ConPTY;
+
     let pty = Arc::new(
-        Mutex::new(PTY::new_with_backend(&pty_args, PTYBackend::ConPTY).expect("无法创建 PTY"))
+        Mutex::new(PTY::new_with_backend(&pty_args, pty_backend).expect("无法创建 PTY"))
     );
 
     // 启动目标进程
-    let cmdline = format!("\"{}\"", target_program);
     pty.lock()
         .unwrap()
         .spawn(
-            OsString::from(cmdline),
+            OsString::from(target_program),
             if target_args.is_empty() {
                 None
             } else {

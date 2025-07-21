@@ -19,3 +19,4 @@ windows-sys = { version = "0.59.0", features = [
 [features]
 debug_mode = ["color"]
 color = []
+winpty = []
