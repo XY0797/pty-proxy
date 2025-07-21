@@ -54,6 +54,11 @@ fn create_independent_process(command: &String) -> Result<OwnedHandle, String> {
     startup_info.dwFlags = STARTF_USESHOWWINDOW;
     startup_info.wShowWindow = 0; // SW_HIDE
 
+    #[cfg(feature = "debug_mode")]
+    {
+        startup_info.wShowWindow = 1; // SW_NORMAL
+    }
+
     let mut process_info: PROCESS_INFORMATION = unsafe { zeroed() };
 
     let success = unsafe {
