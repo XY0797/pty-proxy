@@ -16,10 +16,10 @@ num-traits = "0.2"
 bitflags = "2.3"
 
 [build-dependencies]
-which = "7.0.0"
+which = "8.0.0"
 
 [dependencies.windows]
-version = "0.58.0"
+version = "0.61.3"
 features = [
     "Win32_Foundation",
     "Win32_Storage_FileSystem",
@@ -34,7 +34,7 @@ features = [
 ]
 
 [build-dependencies.windows]
-version = "0.58.0"
+version = "0.61.3"
 features = [
     "Win32_Foundation",
     "Win32_System_LibraryLoader"

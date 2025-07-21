@@ -17,6 +17,7 @@ windows-sys = { version = "0.60.2", features = [
 ] } # Windows API
 
 [features]
+color = [] # 启用彩色显示
 debug_mode = ["color"]
-color = []
-winpty = []
+winpty = ["winpty-rs/winpty"]  # 使用 winpty 模式
+conpty = ["winpty-rs/conpty"]  # 使用 conpty 模式

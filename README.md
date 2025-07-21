@@ -29,25 +29,25 @@
 先运行一次`debug模式`的构建：
 
 ```sh
-cargo build --features debug_mode
+cargo build --features debug_mode --features conpty
 ```
 
 构建过后才能运行：
 
 ```sh
-cargo run --features debug_mode --bin pty-proxy -- cmd.exe /k echo Hello, World!
+cargo run --features debug_mode --features conpty --bin pty-proxy -- cmd.exe /k echo Hello, World!
 ```
 
 如果修改了`pty-proxy-child`，则需要重新运行一次`debug模式`的构建
 
-如果要开发`winpty`后端的版本，在`--features debug_mode`后添加`--features winpty`即可。
+如果要开发`winpty`后端的版本，把`--features conpty`换成`--features winpty`即可。
 
 ## 发行
 
 ### ConPTY后端
 
 ```sh
-cargo build --release
+cargo build --features conpty --release
 ```
 
 `target/release`下的可执行文件即为构建产物
