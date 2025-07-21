@@ -1,66 +1,15 @@
 #[cfg(windows)]
 use windows::Win32::System::LibraryLoader::{GetProcAddress, GetModuleHandleW};
 #[cfg(windows)]
-use windows::core::{PWSTR, PSTR, PCWSTR, PCSTR, HSTRING};
+use windows::core::{PCSTR, HSTRING};
 use std::i64;
 use std::process::Command;
 use std::str;
 use which::which;
 
 #[cfg(windows)]
-trait IntoPWSTR {
-    fn into_pwstr(self) -> PWSTR;
-}
-
-#[cfg(windows)]
-trait IntoPSTR {
-    fn into_pstr(self) -> PSTR;
-}
-
-#[cfg(windows)]
 trait IntoPCSTR {
     fn into_pcstr(self) -> PCSTR;
-}
-
-#[cfg(windows)]
-trait IntoPCWSTR {
-    fn into_pcwstr(self) -> PCWSTR;
-}
-
-#[cfg(windows)]
-impl IntoPCWSTR for &str {
-    fn into_pcwstr(self) -> PCWSTR {
-        let encoded = self
-            .encode_utf16()
-            .chain([0u16])
-            .collect::<Vec<u16>>();
-
-        PCWSTR(encoded.as_ptr())
-    }
-}
-
-#[cfg(windows)]
-impl IntoPWSTR for &str {
-    fn into_pwstr(self) -> PWSTR {
-        let mut encoded = self
-            .encode_utf16()
-            .chain([0u16])
-            .collect::<Vec<u16>>();
-
-        PWSTR(encoded.as_mut_ptr())    }
-}
-
-#[cfg(windows)]
-impl IntoPSTR for &str {
-     fn into_pstr(self) -> PSTR {
-        let mut encoded = self
-            .as_bytes()
-            .iter()
-            .cloned()
-            .chain([0u8])
-            .collect::<Vec<u8>>();
-
-        PSTR(encoded.as_mut_ptr())    }
 }
 
 #[cfg(windows)]
@@ -74,18 +23,6 @@ impl IntoPCSTR for &str {
            .collect::<Vec<u8>>();
 
        PCSTR(encoded.as_ptr())    }
-}
-
-#[cfg(windows)]
-impl IntoPWSTR for String {
-    fn into_pwstr(self) -> PWSTR {
-        let mut encoded = self
-            .encode_utf16()
-            .chain([0u16])
-            .collect::<Vec<u16>>();
-
-        PWSTR(encoded.as_mut_ptr())
-    }
 }
 
 #[cfg(windows)]
