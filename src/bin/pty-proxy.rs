@@ -19,6 +19,9 @@ use windows_sys::{
     Win32::System::Threading::*,
 };
 
+#[cfg(feature = "color")]
+use windows_sys::Win32::System::Console::*;
+
 macro_rules! debug_println {
     ($($arg:tt)*) => {
         #[cfg(feature = "debug_mode")]
@@ -100,6 +103,15 @@ fn main() {
                 io::stdin().lock().read_exact(&mut buf).unwrap();
             })
         );
+    }
+    // 设置控制台属性
+    #[cfg(feature = "color")]
+    unsafe {
+        let handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        let mut console_mode: CONSOLE_MODE = 0;
+        GetConsoleMode(handle, &mut console_mode);
+        console_mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        SetConsoleMode(handle, console_mode);
     }
     // 获取当前可执行文件的文件名（不带扩展名）
     let exe_path = std::env::current_exe().expect("无法获取当前可执行文件路径");

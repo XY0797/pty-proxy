@@ -17,4 +17,5 @@ windows-sys = { version = "0.59.0", features = [
 ] } # Windows API
 
 [features]
-debug_mode = []
+debug_mode = ["color"]
+color = []

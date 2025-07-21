@@ -12,26 +12,32 @@
 
 ## 使用
 
-一共有三个文件：
+一共有两个文件：
 
 `pty-proxy.exe`：主程序，可随意重命名
 
-`pty-proxy-child.exe`：辅助程序，名字不可改
-
-`pty-proxy-color.exe`：主程序，可随意重命名；与`pty-proxy.exe`不同的是，它会主动开启终端的VT100转义序列处理功能
+`pty-proxy-child.exe`：辅助程序，名字不可改，必须和主程序在同一个目录下！
 
 ## 开发
 
-```sh
-cargo run --features debug_mode --bin pty-proxy -- cmd.exe /k echo Hello, World!
-```
+先运行一次`debug模式`的构建：
 
 ```sh
 cargo build --features debug_mode
 ```
 
-## 构建
+构建过后才能运行：
+
+```sh
+cargo run --features debug_mode --bin pty-proxy -- cmd.exe /k echo Hello, World!
+```
+
+如果修改了`pty-proxy-child`，则需要重新运行一次`debug模式`的构建
+
+## 发行
 
 ```sh
 cargo build --release
 ```
+
+`target/release`下的可执行文件即为构建产物
