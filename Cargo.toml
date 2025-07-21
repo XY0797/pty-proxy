@@ -1,13 +1,13 @@
 [package]
 name = "pty-proxy"
-version = "1.1.0"
+version = "1.1.5"
 edition = "2021"
 
 [dependencies]
 winpty-rs = { path = "winpty-rs" } # PTY库
-toml = "0.8.19" # 配置读取
-uuid = { version = "1.12.1", features = ["v4"] } # 唯一标识
-windows-sys = { version = "0.59.0", features = [
+toml = "0.9.2" # 配置读取
+uuid = { version = "1.17.0", features = ["v4"] } # 唯一标识
+windows-sys = { version = "0.60.2", features = [
     "Win32_System_Pipes",
     "Win32_System_Console",
     "Win32_Security",
