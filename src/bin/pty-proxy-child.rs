@@ -4,6 +4,9 @@ use std::sync::{ Arc, Mutex, mpsc };
 use std::io::{ self };
 use std::os::windows::io::{ AsRawHandle, OwnedHandle, FromRawHandle };
 use std::ptr::null_mut;
+use std::io::{ Read, Write };
+use regex::Regex;
+use chrono::Local;
 
 use winptyrs::{ PTY, PTYArgs, MouseMode, AgentConfig, PTYBackend };
 use windows_sys::{ Win32::Foundation::*, Win32::Storage::FileSystem::* };
@@ -118,6 +121,13 @@ fn main() {
     let pty_output = pty.clone();
     let pipe_handle_output = Arc::clone(&pipe_handle_write);
     let ptyread_thread_handle = std::thread::spawn(move || {
+        // 创建日志文件
+        let mut log_file = std::fs::OpenOptions
+            ::new()
+            .create(true)
+            .append(true)
+            .open("output_log_raw.txt")
+            .expect("无法创建或打开日志文件");
         loop {
             // 读取一轮数据并发送到命名管道
             {
@@ -131,6 +141,8 @@ fn main() {
                     write_to_pipe(&pipe_handle_output, output_str.as_bytes()).expect(
                         "无法写入命名管道"
                     );
+                    // 写入日志文件
+                    writeln!(log_file, "{}", output_str).expect("无法写入日志文件");
                 }
             }
 
@@ -219,6 +231,25 @@ fn main() {
     // 等待 PTY 进程结束
     rx.recv().expect("无法接收进程结束信号");
     let exit_status = pty.lock().unwrap().get_exitstatus().expect("无法获取 PTY 退出状态");
+    // 在退出前处理日志文件
+    if let Ok(mut file) = std::fs::File::open("output_log_raw.txt") {
+        let mut content = String::new();
+        if file.read_to_string(&mut content).is_ok() {
+            let re = Regex::new(r"\x1B\[(.*?)[A-Za-z]").unwrap();
+            let cleaned = re.replace_all(&content, "");
+
+            // 获取当前时间并格式化为 YYYYMMDDHHmm 格式
+            let now = Local::now();
+            let timestamp = now.format("%Y%m%d%H%M%S").to_string();
+            let new_filename = format!("output_log_{}.txt", timestamp);
+
+            if let Ok(mut file) = std::fs::File::create(&new_filename) {
+                let _ = file.write_all(cleaned.as_bytes());
+            }
+            // 删除原始日志文件
+            let _ = std::fs::remove_file("output_log_raw.txt");
+        }
+    }
     debug_pause!("进程即将退出，退出代码：{}，按回车键退出...", exit_status.unwrap_or(101));
     exit(exit_status.unwrap_or(101) as i32);
 }

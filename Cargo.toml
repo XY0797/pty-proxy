@@ -15,9 +15,11 @@ windows-sys = { version = "0.60.2", features = [
     "Win32_System_Threading",
     "Win32_System_IO",
 ] } # Windows API
+regex = "1.11.1" # 正则表达式
+chrono = "0.4.41" # 日期时间
 
 [features]
-color = [] # 启用彩色显示
+color = []                    # 启用彩色显示
 debug_mode = ["color"]
-winpty = ["winpty-rs/winpty"]  # 使用 winpty 模式
-conpty = ["winpty-rs/conpty"]  # 使用 conpty 模式
+winpty = ["winpty-rs/winpty"] # 使用 winpty 模式
+conpty = ["winpty-rs/conpty"] # 使用 conpty 模式
