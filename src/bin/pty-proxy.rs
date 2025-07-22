@@ -11,7 +11,7 @@ use std::thread;
 use std::mem::{ zeroed, size_of };
 
 use uuid::Uuid;
-use toml::Value;
+use toml::Table;
 use windows_sys::{
     Win32::Foundation::*,
     Win32::Storage::FileSystem::*,
@@ -144,7 +144,7 @@ fn main() {
         let config_content = fs::read_to_string(config_file_path).expect("无法读取配置文件");
 
         // 解析 TOML 配置文件
-        let config: Value = config_content.parse().expect("无法解析配置文件");
+        let config: Table = config_content.parse().expect("无法解析配置文件");
 
         // 从配置中获取 target_program 和 args
         let target_program = config["target_program"]
