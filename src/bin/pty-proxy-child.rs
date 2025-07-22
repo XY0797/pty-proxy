@@ -1,15 +1,15 @@
-use std::ffi::{ OsString, c_void };
-use std::process::exit;
-use std::sync::{ Arc, Mutex, mpsc };
-use std::io::{ self };
-use std::os::windows::io::{ AsRawHandle, OwnedHandle, FromRawHandle };
-use std::ptr::null_mut;
-use std::io::{ Read, Write };
-use regex::Regex;
 use chrono::Local;
+use regex::Regex;
+use std::ffi::{c_void, OsString};
+use std::io::Write;
+use std::io::{self};
+use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
+use std::process::exit;
+use std::ptr::null_mut;
+use std::sync::{mpsc, Arc, Mutex};
 
-use winptyrs::{ PTY, PTYArgs, MouseMode, AgentConfig, PTYBackend };
-use windows_sys::{ Win32::Foundation::*, Win32::Storage::FileSystem::* };
+use windows_sys::{Win32::Foundation::*, Win32::Storage::FileSystem::*};
+use winptyrs::{AgentConfig, MouseMode, PTYArgs, PTYBackend, PTY};
 
 macro_rules! debug_println {
     ($($arg:tt)*) => {
@@ -35,12 +35,10 @@ fn main() {
     #[cfg(feature = "debug_mode")]
     {
         use std::panic;
-        panic::set_hook(
-            Box::new(|panic_info| {
-                println!("\n{}", panic_info);
-                debug_pause!("Press enter to exit...");
-            })
-        );
+        panic::set_hook(Box::new(|panic_info| {
+            println!("\n{}", panic_info);
+            debug_pause!("Press enter to exit...");
+        }));
     }
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 4 {
@@ -67,19 +65,87 @@ fn main() {
     println!();
 
     // 连接到命名管道
-    let pipe_handle_write = Arc::new(
-        Mutex::new(
-            connect_to_named_pipe_write(pipe_name_write.as_str()).expect("无法连接到命名管道写端")
-        )
-    ); // 包装为线程安全
-    let pipe_handle_read = Arc::new(
-        Mutex::new(
-            connect_to_named_pipe_read(pipe_name_read.as_str()).expect("无法连接到命名管道读端")
-        )
-    ); // 包装为线程安全
+    let pipe_handle_write = Arc::new(Mutex::new(
+        connect_to_named_pipe_write(pipe_name_write.as_str()).expect("无法连接到命名管道写端"),
+    )); // 包装为线程安全
+    let pipe_handle_read = Arc::new(Mutex::new(
+        connect_to_named_pipe_read(pipe_name_read.as_str()).expect("无法连接到命名管道读端"),
+    )); // 包装为线程安全
 
     println!("工作中...");
     println!("working...");
+
+    // 生成带时间戳的日志文件名
+    let now = Local::now();
+    let timestamp = now.format("%Y%m%d%H%M%S").to_string();
+    let log_filename = format!("output_log_{}.txt", timestamp);
+    let (log_sender, log_receiver) = mpsc::channel::<String>();
+
+    // 创建日志处理线程
+    std::thread::spawn(move || {
+        let mut log_file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_filename)
+            .expect("无法创建或打开日志文件");
+        let re = Regex::new(r"\x1B\[(.*?)[A-Za-z]").unwrap();
+        let mut buffer = String::new();
+        let mut state = 0u8; // 0: normal, 1: after \r
+        let mut last_activity = Local::now();
+
+        loop {
+            // 检查超时
+            if !buffer.is_empty()
+                && Local::now().signed_duration_since(last_activity) > chrono::Duration::seconds(1)
+            {
+                let cleaned = re.replace_all(&buffer, "");
+                writeln!(log_file, "{}", cleaned).expect("无法写入日志文件");
+                buffer.clear();
+            }
+
+            match log_receiver.recv_timeout(std::time::Duration::from_millis(100)) {
+                Ok(data) => {
+                    last_activity = Local::now();
+                    for c in data.chars() {
+                        match state {
+                            0 => {
+                                if c == '\r' || c == '\n' {
+                                    // 处理换行
+                                    let cleaned = re.replace_all(&buffer, "");
+                                    writeln!(log_file, "{}", cleaned).expect("无法写入日志文件");
+                                    buffer.clear();
+                                    if c == '\r' {
+                                        state = 1;
+                                    }
+                                } else {
+                                    buffer.push(c);
+                                }
+                            }
+                            1 => {
+                                state = 0;
+                                if c != '\n' {
+                                    if c == '\r' {
+                                        let cleaned = re.replace_all(&buffer, "");
+                                        writeln!(log_file, "{}", cleaned)
+                                            .expect("无法写入日志文件");
+                                        buffer.clear();
+                                        if c == '\r' {
+                                            state = 1;
+                                        }
+                                    } else {
+                                        buffer.push(c);
+                                    }
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(_) => break,
+            }
+        }
+    });
 
     // 创建 PTY
     let pty_args = PTYArgs {
@@ -96,9 +162,9 @@ fn main() {
     #[cfg(not(feature = "winpty"))]
     let pty_backend = PTYBackend::ConPTY;
 
-    let pty = Arc::new(
-        Mutex::new(PTY::new_with_backend(&pty_args, pty_backend).expect("无法创建 PTY"))
-    );
+    let pty = Arc::new(Mutex::new(
+        PTY::new_with_backend(&pty_args, pty_backend).expect("无法创建 PTY"),
+    ));
 
     // 启动目标进程
     pty.lock()
@@ -111,7 +177,7 @@ fn main() {
                 Some(OsString::from(target_args))
             },
             None,
-            None
+            None,
         )
         .expect("无法启动目标进程");
 
@@ -121,13 +187,6 @@ fn main() {
     let pty_output = pty.clone();
     let pipe_handle_output = Arc::clone(&pipe_handle_write);
     let ptyread_thread_handle = std::thread::spawn(move || {
-        // 创建日志文件
-        let mut log_file = std::fs::OpenOptions
-            ::new()
-            .create(true)
-            .append(true)
-            .open("output_log_raw.txt")
-            .expect("无法创建或打开日志文件");
         loop {
             // 读取一轮数据并发送到命名管道
             {
@@ -137,12 +196,11 @@ fn main() {
                 };
                 if !output.is_empty() {
                     debug_println!("收到数据，转发..");
-                    let output_str = output.to_string_lossy();
-                    write_to_pipe(&pipe_handle_output, output_str.as_bytes()).expect(
-                        "无法写入命名管道"
-                    );
-                    // 写入日志文件
-                    writeln!(log_file, "{}", output_str).expect("无法写入日志文件");
+                    let output_str = output.to_string_lossy().into_owned();
+                    write_to_pipe(&pipe_handle_output, output_str.as_bytes())
+                        .expect("无法写入命名管道");
+                    // 发送到日志处理线程
+                    log_sender.send(output_str).expect("无法发送日志数据");
                 }
             }
 
@@ -168,9 +226,8 @@ fn main() {
                                 return;
                             } else {
                                 let output_str = output.to_string_lossy();
-                                write_to_pipe(&pipe_handle_output, output_str.as_bytes()).expect(
-                                    "无法写入命名管道"
-                                );
+                                write_to_pipe(&pipe_handle_output, output_str.as_bytes())
+                                    .expect("无法写入命名管道");
                             }
                         }
                         Err(_) => {
@@ -230,27 +287,16 @@ fn main() {
 
     // 等待 PTY 进程结束
     rx.recv().expect("无法接收进程结束信号");
-    let exit_status = pty.lock().unwrap().get_exitstatus().expect("无法获取 PTY 退出状态");
-    // 在退出前处理日志文件
-    if let Ok(mut file) = std::fs::File::open("output_log_raw.txt") {
-        let mut content = String::new();
-        if file.read_to_string(&mut content).is_ok() {
-            let re = Regex::new(r"\x1B\[(.*?)[A-Za-z]").unwrap();
-            let cleaned = re.replace_all(&content, "");
-
-            // 获取当前时间并格式化为 YYYYMMDDHHmm 格式
-            let now = Local::now();
-            let timestamp = now.format("%Y%m%d%H%M%S").to_string();
-            let new_filename = format!("output_log_{}.txt", timestamp);
-
-            if let Ok(mut file) = std::fs::File::create(&new_filename) {
-                let _ = file.write_all(cleaned.as_bytes());
-            }
-            // 删除原始日志文件
-            let _ = std::fs::remove_file("output_log_raw.txt");
-        }
-    }
-    debug_pause!("进程即将退出，退出代码：{}，按回车键退出...", exit_status.unwrap_or(101));
+    let exit_status = pty
+        .lock()
+        .unwrap()
+        .get_exitstatus()
+        .expect("无法获取 PTY 退出状态");
+    // 日志已由单独线程处理，无需在此处理
+    debug_pause!(
+        "进程即将退出，退出代码：{}，按回车键退出...",
+        exit_status.unwrap_or(101)
+    );
     exit(exit_status.unwrap_or(101) as i32);
 }
 
@@ -265,7 +311,7 @@ fn connect_to_named_pipe_write(pipe_name: &str) -> io::Result<OwnedHandle> {
             null_mut(),
             OPEN_EXISTING,
             FILE_FLAG_OVERLAPPED,
-            null_mut()
+            null_mut(),
         )
     };
     if pipe_handle == INVALID_HANDLE_VALUE {
@@ -276,7 +322,15 @@ fn connect_to_named_pipe_write(pipe_name: &str) -> io::Result<OwnedHandle> {
 fn connect_to_named_pipe_read(pipe_name: &str) -> io::Result<OwnedHandle> {
     let pipe_name = pipe_name.as_bytes();
     let pipe_handle = unsafe {
-        CreateFileA(pipe_name.as_ptr(), GENERIC_READ, 0, null_mut(), OPEN_EXISTING, 0, null_mut())
+        CreateFileA(
+            pipe_name.as_ptr(),
+            GENERIC_READ,
+            0,
+            null_mut(),
+            OPEN_EXISTING,
+            0,
+            null_mut(),
+        )
     };
     if pipe_handle == INVALID_HANDLE_VALUE {
         return Err(io::Error::last_os_error());
@@ -294,7 +348,7 @@ fn write_to_pipe(pipe_handle: &Arc<Mutex<OwnedHandle>>, data: &[u8]) -> io::Resu
             data.as_ptr() as *const _,
             data.len() as u32,
             &mut bytes_written,
-            null_mut()
+            null_mut(),
         )
     };
     if result == 0 {
@@ -313,7 +367,7 @@ fn read_from_pipe(pipe_handle: &Arc<Mutex<OwnedHandle>>, buffer: &mut [u8]) -> i
             buffer.as_mut_ptr() as *mut _,
             buffer.len() as u32,
             &mut bytes_read,
-            null_mut()
+            null_mut(),
         )
     };
     if result == 0 {
