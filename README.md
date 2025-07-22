@@ -1,6 +1,6 @@
 # 终端代理
 
-将诸如Python等不支持`重定向IO`的应用，使用`ConPTY/WinPTY API`代理成可`重定向IO`的程序
+将诸如Python等不支持`重定向IO`的应用，使用`ConPTY/WinPTY API`代理成可`重定向IO`的程序。并且会把输出写到工作目录下的日志文件`output_log_YYYYMMDDHHMMSS.txt`(日期后缀为启动日期)。
 
 比如：配置`pty-proxy`的目标应用为python，就可以把`pty-proxy`当成python直接启动然后`重定向IO`
 
@@ -67,3 +67,9 @@ cargo build --features winpty --release
 ```
 
 `target/release`下的可执行文件即为构建产物，发行时需要把`winpty-agent.exe`、`winpty.dll`和构建产物放到同一个文件夹下，否则会无法运行。
+
+如果需要给其它基于WinPTY的面板使用，则需要激活color特性：
+
+```sh
+cargo build --features winpty --features color --release
+```
